@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard NPS B2C · PneuStore</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #f5f4f9;
+    --surface:    #ffffff;
+    --surface2:   #f8f7fc;
+    --border:     #e4e1f0;
+    --purple:     #6b21a8;
+    --purple-mid: #7c3aed;
+    --purple-btn: #5b21b6;
+    --purple-lt:  #ede9fe;
+    --purple-nav: #5b21b6;
+    --promotor:   #16a34a;
+    --neutro:     #d97706;
+    --detrator:   #dc2626;
+    --text:       #1a0533;
+    --muted:      #7c6f9a;
+    --radius:     12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* ─── UPLOAD ─── */
+  #upload-screen {
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:40px 20px;
+    background:linear-gradient(160deg,#4c1d95 0%,#6d28d9 50%,#3b0764 100%);
+  }
+  .upload-brand {
+    display:flex; align-items:center; gap:10px; margin-bottom:36px;
+  }
+  .upload-brand-logo {
+    background:#fff; border-radius:10px; padding:8px 14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .infinity { font-size:1.6rem; color:var(--purple); line-height:1; }
+  .brand-name { font-size:1.1rem; font-weight:800; color:var(--purple); letter-spacing:.01em; }
+  .brand-name span { font-weight:400; }
+  .upload-title {
+    font-size:clamp(1.8rem,4.5vw,3rem); font-weight:900;
+    text-align:center; margin-bottom:10px; color:#fff; letter-spacing:-.02em; line-height:1.1;
+  }
+  .upload-title span { color:#c4b5fd; }
+  .upload-sub { color:rgba(255,255,255,.55); font-size:.93rem; margin-bottom:44px; text-align:center; }
+  .drop-zone {
+    width:min(480px,90vw); border:2px dashed rgba(255,255,255,.3); border-radius:18px;
+    padding:52px 36px; text-align:center; cursor:pointer; transition:all .3s;
+    background:rgba(255,255,255,.09); backdrop-filter:blur(10px);
+  }
+  .drop-zone:hover,.drop-zone.dragover {
+    border-color:rgba(255,255,255,.7); background:rgba(255,255,255,.16);
+    transform:translateY(-3px); box-shadow:0 20px 50px rgba(0,0,0,.25);
+  }
+  .drop-icon { font-size:2.8rem; margin-bottom:14px; display:block; }
+  .drop-text { font-size:1rem; font-weight:700; color:#fff; margin-bottom:6px; }
+  .drop-hint { font-size:.83rem; color:rgba(255,255,255,.45); }
+  #file-input { display:none; }
+  .tag { display:inline-block; background:rgba(196,181,253,.18); border:1px solid rgba(196,181,253,.35); color:#c4b5fd; font-size:.72rem; padding:4px 12px; border-radius:20px; margin-top:14px; }
+
+  /* ─── LOADER ─── */
+  .loader { position:fixed; inset:0; background:rgba(76,29,149,.96); display:flex; align-items:center; justify-content:center; z-index:999; flex-direction:column; gap:14px; font-size:.88rem; color:rgba(255,255,255,.6); }
+  .loader-ring { width:46px; height:46px; border:3px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ─── EXPORT OVERLAY ─── */
+  #export-overlay { position:fixed; inset:0; background:rgba(76,29,149,.88); z-index:9999; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  .export-ring { width:46px; height:46px; border:3px solid rgba(255,255,255,.25); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+  .export-msg { color:rgba(255,255,255,.7); font-size:.88rem; }
+
+  /* ─── DASHBOARD ─── */
+  #dashboard { display:none; padding-bottom:60px; }
+
+  /* top-bar */
+  .top-bar {
+    background:var(--purple-nav);
+    padding:0 40px; display:flex; align-items:stretch; justify-content:space-between;
+    position:sticky; top:0; z-index:100; height:60px;
+    box-shadow:0 2px 16px rgba(91,33,182,.35);
+  }
+  .top-bar-left { display:flex; align-items:center; gap:0; }
+  .logo-pill {
+    background:#fff; border-radius:8px; padding:6px 14px;
+    display:flex; align-items:center; gap:7px; margin-right:20px;
+  }
+  .logo-pill .inf { font-size:1.3rem; color:var(--purple); line-height:1; }
+  .logo-pill .lname { font-size:.88rem; font-weight:800; color:var(--purple); }
+  .logo-pill .lname span { font-weight:400; }
+  .topbar-divider { width:1px; height:22px; background:rgba(255,255,255,.2); margin-right:20px; }
+  .top-bar-title { font-size:.85rem; font-weight:700; letter-spacing:.06em; color:rgba(255,255,255,.55); text-transform:uppercase; }
+  .top-bar-title strong { color:#fff; }
+  .badge-mes { background:rgba(255,255,255,.15); color:#c4b5fd; font-size:.68rem; font-weight:700; padding:3px 11px; border-radius:5px; text-transform:uppercase; letter-spacing:.09em; border:1px solid rgba(196,181,253,.3); margin-left:10px; }
+
+  .top-bar-right { display:flex; align-items:center; gap:10px; }
+  .btn-export {
+    background:#fff; color:var(--purple); border:none; padding:8px 20px; border-radius:8px;
+    cursor:pointer; font-size:.78rem; font-weight:800; font-family:'Inter',sans-serif;
+    display:flex; align-items:center; gap:7px; transition:all .2s;
+    text-transform:uppercase; letter-spacing:.06em; white-space:nowrap;
+  }
+  .btn-export:hover { background:#ede9fe; transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,.18); }
+  .btn-export.loading { opacity:.55; pointer-events:none; }
+  .btn-new { background:transparent; border:1px solid rgba(255,255,255,.22); color:rgba(255,255,255,.55); padding:7px 15px; border-radius:8px; cursor:pointer; font-size:.77rem; font-family:'Inter',sans-serif; transition:all .2s; white-space:nowrap; }
+  .btn-new:hover { border-color:rgba(255,255,255,.5); color:#fff; }
+
+  .content { padding:26px 40px 0; max-width:1400px; margin:0 auto; }
+
+  /* ─── FILTER BAR ─── */
+  .filter-bar { display:flex; gap:8px; align-items:center; margin-bottom:22px; flex-wrap:wrap; }
+  .filter-label { font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.13em; font-weight:700; margin-right:4px; }
+  .filter-btn {
+    padding:7px 18px; border-radius:8px; border:1.5px solid var(--border);
+    background:var(--surface); color:var(--muted); cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:.78rem; font-weight:600;
+    transition:all .18s; display:flex; align-items:center; gap:7px;
+    text-transform:uppercase; letter-spacing:.05em;
+  }
+  .filter-btn .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .filter-btn:hover { color:var(--text); border-color:#b0a8cc; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+  .filter-btn.active-all  { border-color:var(--purple);   color:var(--purple);   background:var(--purple-lt); }
+  .filter-btn.active-prom { border-color:var(--promotor); color:var(--promotor); background:#f0fdf4; }
+  .filter-btn.active-neut { border-color:var(--neutro);   color:var(--neutro);   background:#fffbeb; }
+  .filter-btn.active-detr { border-color:var(--detrator); color:var(--detrator); background:#fef2f2; }
+  .filter-context { margin-left:auto; font-size:.76rem; color:var(--muted); background:var(--surface); border:1.5px solid var(--border); padding:5px 14px; border-radius:8px; white-space:nowrap; transition:all .25s; }
+  .filter-context.active { color:var(--purple); border-color:var(--purple-mid); background:var(--purple-lt); font-weight:600; }
+
+  /* ─── NPS HERO ─── */
+  .nps-hero { display:grid; grid-template-columns:270px 1fr; gap:18px; margin-bottom:18px; }
+
+  .gauge-card {
+    background:linear-gradient(145deg,#4c1d95,#7c3aed);
+    border-radius:var(--radius); padding:28px 24px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    box-shadow:0 8px 28px rgba(109,40,217,.22);
+  }
+  .gauge-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.15em; color:rgba(255,255,255,.55); margin-bottom:10px; font-weight:700; }
+  .gauge-wrap { position:relative; width:165px; height:92px; }
+  .gauge-score { position:absolute; bottom:-4px; left:50%; transform:translateX(-50%); font-size:3rem; font-weight:900; color:#fff; white-space:nowrap; }
+  .gauge-zone { font-size:.7rem; color:rgba(255,255,255,.55); margin-top:6px; text-align:center; }
+  .gauge-total { font-size:.7rem; color:rgba(255,255,255,.4); margin-top:3px; }
+
+  .zones-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .zone-card {
+    background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius);
+    padding:22px 18px; display:flex; flex-direction:column; gap:4px;
+    cursor:pointer; transition:all .18s; position:relative; overflow:hidden; user-select:none;
+  }
+  .zone-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .zone-card.prom::before { background:var(--promotor); }
+  .zone-card.neut::before { background:var(--neutro); }
+  .zone-card.detr::before { background:var(--detrator); }
+  .zone-card:hover { transform:translateY(-2px); box-shadow:0 6px 22px rgba(0,0,0,.1); }
+  .zone-card.prom:hover,.zone-card.prom.selected { border-color:var(--promotor); background:#f0fdf4; }
+  .zone-card.neut:hover,.zone-card.neut.selected { border-color:var(--neutro);   background:#fffbeb; }
+  .zone-card.detr:hover,.zone-card.detr.selected { border-color:var(--detrator); background:#fef2f2; }
+  .zone-card.dimmed { opacity:.22; transform:none !important; box-shadow:none !important; }
+  .click-hint { font-size:.63rem; color:var(--muted); margin-top:3px; opacity:0; transition:opacity .18s; }
+  .zone-card:hover .click-hint,.zone-card.selected .click-hint { opacity:1; }
+  .zone-name { font-size:.66rem; text-transform:uppercase; letter-spacing:.13em; color:var(--muted); font-weight:700; }
+  .zone-count { font-size:2.3rem; font-weight:900; line-height:1; }
+  .zone-card.prom .zone-count { color:var(--promotor); }
+  .zone-card.neut .zone-count { color:var(--neutro); }
+  .zone-card.detr .zone-count { color:var(--detrator); }
+  .zone-pct { font-size:.78rem; color:var(--muted); }
+
+  /* ─── CHARTS GRID ─── */
+  .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
+  .chart-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:22px; }
+  .chart-card.full { grid-column:1/-1; }
+  .card-title {
+    font-size:.66rem; text-transform:uppercase; letter-spacing:.14em; color:var(--muted);
+    margin-bottom:16px; font-weight:700; display:flex; align-items:center; gap:8px;
+  }
+  .card-title::before { content:''; display:block; width:3px; height:11px; background:var(--purple); border-radius:2px; flex-shrink:0; }
+  .chart-wrap { position:relative; height:196px; }
+  .chart-wrap.tall { height:270px; }
+
+  /* SENTIMENTO BAR */
+  .sentiment-bar { display:flex; border-radius:6px; overflow:hidden; height:38px; margin-bottom:12px; }
+  .sent-seg { display:flex; align-items:center; justify-content:center; font-size:.77rem; font-weight:700; transition:flex .5s cubic-bezier(.4,0,.2,1); min-width:0; overflow:hidden; }
+  .sent-seg.pos { background:var(--promotor); color:#fff; }
+  .sent-seg.neu { background:var(--neutro);   color:#fff; }
+  .sent-seg.neg { background:var(--detrator); color:#fff; }
+  .sentiment-legend { display:flex; gap:14px; flex-wrap:wrap; }
+  .leg-item { display:flex; align-items:center; gap:6px; font-size:.79rem; color:var(--muted); }
+  .leg-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+
+  /* NOTA BARS */
+  .nota-bars { display:flex; align-items:flex-end; gap:4px; height:120px; padding-bottom:20px; }
+  .nota-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:3px; }
+  .nota-bar { width:100%; border-radius:4px 4px 0 0; transition:height .5s cubic-bezier(.4,0,.2,1); min-height:3px; }
+  .nota-bar-label { font-size:.64rem; color:var(--muted); font-weight:600; }
+  .nota-bar-count { font-size:.64rem; font-weight:700; }
+
+  /* TEMAS */
+  .temas-list { display:flex; flex-direction:column; gap:9px; }
+  .tema-row { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:10px; }
+  .tema-name { font-size:.82rem; }
+  .tema-bar-wrap { width:80px; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .tema-bar-fill { height:100%; border-radius:2px; background:var(--purple-mid); transition:width .5s; }
+  .tema-count { font-size:.77rem; color:var(--muted); min-width:24px; text-align:right; font-weight:600; }
+
+  /* SUBTEMAS */
+  .subtema-pills { display:flex; flex-wrap:wrap; gap:7px; }
+  .subtema-pill { background:var(--surface2); border:1.5px solid var(--border); border-radius:6px; padding:5px 11px; font-size:.77rem; display:flex; align-items:center; gap:7px; transition:border-color .18s; }
+  .subtema-pill:hover { border-color:var(--purple-mid); }
+  .pill-n { background:var(--purple); color:#fff; font-size:.65rem; font-weight:700; padding:2px 7px; border-radius:4px; }
+
+  .empty-msg { color:var(--muted); font-size:.84rem; }
+
+  @media(max-width:900px){
+    .nps-hero,.zones-grid,.charts-grid{grid-template-columns:1fr;}
+    .content{padding:16px 16px 0;}
+    .top-bar{padding:0 16px;}
+    .filter-context{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<!-- UPLOAD -->
+<div id="upload-screen">
+  <div class="upload-brand">
+    <div class="upload-brand-logo">
+      <span class="infinity">∞</span>
+      <span class="brand-name">Pneu<span>Store</span></span>
+    </div>
+  </div>
+  <h1 class="upload-title">Dashboard <span>NPS B2C</span></h1>
+  <p class="upload-sub">Faça upload da base mensal para gerar o painel automaticamente</p>
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <span class="drop-icon">📊</span>
+    <p class="drop-text">Arraste sua planilha aqui</p>
+    <p class="drop-hint">ou clique para selecionar</p>
+    <span class="tag">.xlsx · .xls</span>
+  </div>
+  <input type="file" id="file-input" accept=".xlsx,.xls">
+</div>
+
+<!-- LOADER -->
+<div class="loader" id="loader" style="display:none">
+  <div class="loader-ring"></div>
+  <span>Processando base...</span>
+</div>
+
+<!-- EXPORT OVERLAY -->
+<div id="export-overlay" style="display:none;position:fixed;inset:0;background:rgba(76,29,149,.88);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px;">
+  <div class="export-ring" style="width:46px;height:46px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
+  <span style="color:rgba(255,255,255,.7);font-size:.88rem;">Gerando imagem...</span>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="logo-pill">
+        <span class="inf">∞</span>
+        <span class="lname">Pneu<span>Store</span></span>
+      </div>
+      <div class="topbar-divider"></div>
+      <span class="top-bar-title"><strong>NPS B2C</strong> · Pesquisa de Satisfação</span>
+      <span class="badge-mes" id="badge-mes">—</span>
+    </div>
+    <div class="top-bar-right">
+      <button class="btn-export" id="btn-export" onclick="exportDashboard()">
+        ⬇ Exportar imagem
+      </button>
+      <button class="btn-new" onclick="resetDashboard()">↩ Nova base</button>
+    </div>
+  </div>
+
+  <div class="content" id="dash-content">
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <span class="filter-label">Filtrar por:</span>
+      <button class="filter-btn active-all" id="btn-all"      onclick="setFilter('all')">      <span class="dot" style="background:var(--purple)"></span>   Todos       </button>
+      <button class="filter-btn"            id="btn-Promotor" onclick="setFilter('Promotor')"> <span class="dot" style="background:var(--promotor)"></span> Promotores  </button>
+      <button class="filter-btn"            id="btn-Neutro"   onclick="setFilter('Neutro')">   <span class="dot" style="background:var(--neutro)"></span>   Neutros     </button>
+      <button class="filter-btn"            id="btn-Detrator" onclick="setFilter('Detrator')"> <span class="dot" style="background:var(--detrator)"></span> Detratores  </button>
+      <span class="filter-context" id="filter-context">Mostrando todos os respondentes</span>
+    </div>
+
+    <!-- NPS HERO -->
+    <div class="nps-hero">
+      <div class="gauge-card">
+        <p class="gauge-label">NPS Score</p>
+        <div class="gauge-wrap"><canvas id="gaugeChart"></canvas><div class="gauge-score" id="npsScore">—</div></div>
+        <p class="gauge-zone" id="npsZone">—</p>
+        <p class="gauge-total" id="gaugeTotal">—</p>
+      </div>
+      <div class="zones-grid">
+        <div class="zone-card prom" id="card-Promotor" onclick="setFilter('Promotor')">
+          <span class="zone-name">Promotores</span>
+          <span class="zone-count" id="countProm">—</span>
+          <span class="zone-pct"   id="pctProm">—</span>
+          <span class="click-hint" id="hint-Promotor">clique para filtrar →</span>
+        </div>
+        <div class="zone-card neut" id="card-Neutro" onclick="setFilter('Neutro')">
+          <span class="zone-name">Neutros</span>
+          <span class="zone-count" id="countNeut">—</span>
+          <span class="zone-pct"   id="pctNeut">—</span>
+          <span class="click-hint" id="hint-Neutro">clique para filtrar →</span>
+        </div>
+        <div class="zone-card detr" id="card-Detrator" onclick="setFilter('Detrator')">
+          <span class="zone-name">Detratores</span>
+          <span class="zone-count" id="countDetr">—</span>
+          <span class="zone-pct"   id="pctDetr">—</span>
+          <span class="click-hint" id="hint-Detrator">clique para filtrar →</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SENTIMENTO + NOTAS -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <p class="card-title">Distribuição de Sentimento</p>
+        <div class="sentiment-bar" id="sentimentBar"></div>
+        <div class="sentiment-legend" id="sentimentLegend"></div>
+        <div style="margin-top:18px"><div class="chart-wrap"><canvas id="sentimentChart"></canvas></div></div>
+      </div>
+      <div class="chart-card">
+        <p class="card-title">Distribuição das Notas</p>
+        <div class="nota-bars" id="notaBars"></div>
+      </div>
+    </div>
+
+    <!-- TEMAS + SUBTEMAS -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <p class="card-title">Principais Temas</p>
+        <div class="temas-list" id="temasList"></div>
+      </div>
+      <div class="chart-card">
+        <p class="card-title">Subtemas mais citados</p>
+        <div class="subtema-pills" id="subtemaPills"></div>
+      </div>
+    </div>
+
+    <!-- TEMAS x CLASSIFICAÇÃO -->
+    <div class="charts-grid" style="margin-bottom:0">
+      <div class="chart-card full">
+        <p class="card-title">Temas por Classificação NPS</p>
+        <div class="chart-wrap tall"><canvas id="temaClassChart"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /dashboard -->
+
+<script>
+let charts = {};
+let globalData = null;
+let currentFilter = 'all';
+
+// ── FILE ──────────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+dropZone.addEventListener('dragover', e=>{e.preventDefault();dropZone.classList.add('dragover');});
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e=>{e.preventDefault();dropZone.classList.remove('dragover');handleFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener('change', e=>handleFile(e.target.files[0]));
+
+function handleFile(file){
+  if(!file) return;
+  document.getElementById('loader').style.display='flex';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    setTimeout(()=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const data=XLSX.utils.sheet_to_json(ws,{defval:null});
+        processData(data,file.name);
+      }catch(err){alert('Erro ao ler o arquivo.');document.getElementById('loader').style.display='none';}
+    },300);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function resetDashboard(){
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('upload-screen').style.display='flex';
+  fileInput.value='';
+  Object.values(charts).forEach(c=>c&&c.destroy());
+  charts={};globalData=null;currentFilter='all';
+}
+
+// ── PROCESS ───────────────────────────────────────────────────────────────────
+function processData(data,fileName){
+  const keys=Object.keys(data[0]||{});
+  const getCol=(...names)=>keys.find(k=>names.some(n=>k.toLowerCase().includes(n.toLowerCase())));
+  const cols={
+    nota:getCol('nota'), class:getCol('classificacao','classificação','class'),
+    sent:getCol('sentimento'), t1:getCol('tema 1','tema1'), s1:getCol('subtema 1','subtema1'),
+    t2:getCol('tema 2','tema2'), s2:getCol('subtema 2','subtema2'),
+  };
+  const m=fileName.match(/(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i);
+  const mes=m?m[1].charAt(0).toUpperCase()+m[1].slice(1).toLowerCase():fileName.replace(/\.[^.]+$/,'');
+  globalData={rows:data,cols,mes};
+  currentFilter='all';
+  document.getElementById('upload-screen').style.display='none';
+  document.getElementById('loader').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('badge-mes').textContent=mes;
+  renderAll();
+}
+
+// ── FILTER ────────────────────────────────────────────────────────────────────
+function setFilter(f){
+  currentFilter=(currentFilter===f&&f!=='all')?'all':f;
+  updateFilterUI();
+  renderAll();
+}
+function updateFilterUI(){
+  const f=currentFilter;
+  const map={all:['btn-all','active-all'],Promotor:['btn-Promotor','active-prom'],Neutro:['btn-Neutro','active-neut'],Detrator:['btn-Detrator','active-detr']};
+  Object.entries(map).forEach(([key,[id,cls]])=>{
+    document.getElementById(id).className='filter-btn'+(key===f?' '+cls:'');
+  });
+  ['Promotor','Neutro','Detrator'].forEach(c=>{
+    const card=document.getElementById('card-'+c);
+    const hint=document.getElementById('hint-'+c);
+    card.classList.remove('selected','dimmed');
+    if(f==='all'){hint.textContent='clique para filtrar →';return;}
+    if(f===c){card.classList.add('selected');hint.textContent='clique para remover ✕';}
+    else card.classList.add('dimmed');
+  });
+  const labels={all:'Mostrando todos os respondentes',Promotor:'Filtrando: Promotores (notas 9–10)',Neutro:'Filtrando: Neutros (notas 7–8)',Detrator:'Filtrando: Detratores (notas 0–6)'};
+  const ctx=document.getElementById('filter-context');
+  ctx.textContent=labels[f];
+  ctx.className='filter-context'+(f!=='all'?' active':'');
+}
+
+function getFiltered(){
+  const{rows,cols}=globalData;
+  return currentFilter==='all'?rows:rows.filter(r=>r[cols.class]===currentFilter);
+}
+
+// ── COMPUTE ───────────────────────────────────────────────────────────────────
+function computeStats(rows){
+  const{cols}=globalData;
+  const notas=rows.map(r=>r[cols.nota]).filter(v=>v!=null&&!isNaN(v));
+  const total=notas.length;
+  const promotores=notas.filter(n=>n>=9).length;
+  const neutros=notas.filter(n=>n>=7&&n<=8).length;
+  const detratores=notas.filter(n=>n<=6).length;
+  const nps=total?Math.round(((promotores-detratores)/total)*100):0;
+  const sentMap={},temaMap={},subMap={};
+  rows.forEach(r=>{
+    if(r[cols.sent])sentMap[r[cols.sent]]=(sentMap[r[cols.sent]]||0)+1;
+    [r[cols.t1],r[cols.t2]].forEach(t=>{if(t&&!/sem comentário|não informado/i.test(t))temaMap[t]=(temaMap[t]||0)+1;});
+    [r[cols.s1],r[cols.s2]].forEach(s=>{if(s&&!/sem comentário/i.test(s))subMap[s]=(subMap[s]||0)+1;});
+  });
+  // temaClass always from all rows
+  const temaClass={};
+  globalData.rows.forEach(r=>{
+    const cl=r[cols.class],t=r[cols.t1];
+    if(cl&&t&&!/sem comentário/i.test(t)){
+      if(!temaClass[t])temaClass[t]={Promotor:0,Neutro:0,Detrator:0};
+      if(temaClass[t][cl]!==undefined)temaClass[t][cl]++;
+    }
+  });
+  const notaDist={};
+  for(let i=0;i<=10;i++)notaDist[i]=0;
+  notas.forEach(n=>{if(notaDist[n]!==undefined)notaDist[n]++;});
+  return{total,promotores,neutros,detratores,nps,sentMap,temaMap,subMap,temaClass,notaDist};
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderAll(){
+  const d=computeStats(getFiltered());
+  const all=computeStats(globalData.rows);
+
+  // Gauge / NPS — always full base
+  const npsEl=document.getElementById('npsScore');
+  npsEl.textContent=all.nps;
+  let zone,zoneColor;
+  if(all.nps>=75){zone='🏆 Zona de Excelência';zoneColor='#86efac';}
+  else if(all.nps>=50){zone='✅ Zona de Qualidade';zoneColor='#c4b5fd';}
+  else if(all.nps>=0){zone='⚠️ Zona de Aperfeiçoamento';zoneColor='#fcd34d';}
+  else{zone='❌ Zona Crítica';zoneColor='#fca5a5';}
+  npsEl.style.color=zoneColor;
+  document.getElementById('npsZone').textContent=zone;
+  document.getElementById('gaugeTotal').textContent=`${all.total} respondentes`;
+  renderGauge(all.nps,zoneColor);
+
+  // Cards — always full totals
+  document.getElementById('countProm').textContent=all.promotores;
+  document.getElementById('countNeut').textContent=all.neutros;
+  document.getElementById('countDetr').textContent=all.detratores;
+  document.getElementById('pctProm').textContent=`${Math.round(all.promotores/all.total*100)}% do total`;
+  document.getElementById('pctNeut').textContent=`${Math.round(all.neutros/all.total*100)}% do total`;
+  document.getElementById('pctDetr').textContent=`${Math.round(all.detratores/all.total*100)}% do total`;
+
+  // Sentimento — filtered
+  const pos=d.sentMap['Positivo']||0,neu=d.sentMap['Neutro']||0,neg=d.sentMap['Negativo']||0;
+  const totS=pos+neu+neg||1;
+  document.getElementById('sentimentBar').innerHTML=`
+    <div class="sent-seg pos" style="flex:${pos||.01}">${pos?Math.round(pos/totS*100)+'%':''}</div>
+    <div class="sent-seg neu" style="flex:${neu||.01}">${neu?Math.round(neu/totS*100)+'%':''}</div>
+    <div class="sent-seg neg" style="flex:${neg||.01}">${neg?Math.round(neg/totS*100)+'%':''}</div>`;
+  document.getElementById('sentimentLegend').innerHTML=`
+    <div class="leg-item"><div class="leg-dot" style="background:var(--promotor)"></div>Positivo (${pos})</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--neutro)"></div>Neutro (${neu})</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--detrator)"></div>Negativo (${neg})</div>`;
+  if(charts.sentiment)charts.sentiment.destroy();
+  charts.sentiment=new Chart(document.getElementById('sentimentChart'),{
+    type:'doughnut',
+    data:{labels:['Positivo','Neutro','Negativo'],datasets:[{data:[pos,neu,neg],backgroundColor:['#16a34a','#d97706','#dc2626'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#7c6f9a',font:{family:'Inter',size:11},padding:12}}},cutout:'68%'}
+  });
+
+  // Notas — filtered
+  const maxN=Math.max(...Object.values(d.notaDist),1);
+  const nc=i=>i>=9?'#16a34a':i>=7?'#d97706':'#dc2626';
+  document.getElementById('notaBars').innerHTML=Object.entries(d.notaDist).map(([n,c])=>
+    `<div class="nota-bar-wrap">
+      <span class="nota-bar-count" style="color:${nc(+n)}">${c>0?c:''}</span>
+      <div class="nota-bar" style="height:${c===0?3:Math.max(5,Math.round(c/maxN*100))}px;background:${nc(+n)}"></div>
+      <span class="nota-bar-label">${n}</span>
+    </div>`).join('');
+
+  // Temas — filtered
+  const sortT=Object.entries(d.temaMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxT=sortT[0]?.[1]||1;
+  document.getElementById('temasList').innerHTML=sortT.length
+    ?sortT.map(([name,count])=>`<div class="tema-row"><span class="tema-name">${name}</span><div class="tema-bar-wrap"><div class="tema-bar-fill" style="width:${Math.round(count/maxT*100)}%"></div></div><span class="tema-count">${count}</span></div>`).join('')
+    :'<p class="empty-msg">Sem dados para este filtro</p>';
+
+  // Subtemas — filtered
+  const sortS=Object.entries(d.subMap).sort((a,b)=>b[1]-a[1]).slice(0,20);
+  document.getElementById('subtemaPills').innerHTML=sortS.length
+    ?sortS.map(([name,count])=>`<div class="subtema-pill">${name}<span class="pill-n">${count}</span></div>`).join('')
+    :'<p class="empty-msg">Sem dados</p>';
+
+  // Temas x Classificação — always full, highlight active
+  const temaKeys=Object.keys(all.temaClass)
+    .sort((a,b)=>(all.temaClass[b].Promotor+all.temaClass[b].Neutro+all.temaClass[b].Detrator)-(all.temaClass[a].Promotor+all.temaClass[a].Neutro+all.temaClass[a].Detrator))
+    .slice(0,8);
+  const fade=(color,key)=>currentFilter==='all'||currentFilter===key?color:color+'40';
+  if(charts.temaClass)charts.temaClass.destroy();
+  charts.temaClass=new Chart(document.getElementById('temaClassChart'),{
+    type:'bar',
+    data:{
+      labels:temaKeys,
+      datasets:[
+        {label:'Promotor',data:temaKeys.map(t=>all.temaClass[t].Promotor),backgroundColor:fade('#16a34a','Promotor'),borderRadius:4},
+        {label:'Neutro',  data:temaKeys.map(t=>all.temaClass[t].Neutro),  backgroundColor:fade('#d97706','Neutro'),  borderRadius:4},
+        {label:'Detrator',data:temaKeys.map(t=>all.temaClass[t].Detrator),backgroundColor:fade('#dc2626','Detrator'),borderRadius:4},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#7c6f9a',font:{family:'Inter',size:11},padding:18}}},
+      scales:{
+        x:{stacked:true,ticks:{color:'#7c6f9a',font:{family:'Inter'}},grid:{color:'#e4e1f0'}},
+        y:{stacked:true,ticks:{color:'#7c6f9a',font:{family:'Inter'}},grid:{color:'#e4e1f0'}}
+      }
+    }
+  });
+}
+
+function renderGauge(score,color){
+  if(charts.gauge)charts.gauge.destroy();
+  const pct=(score+100)/200;
+  charts.gauge=new Chart(document.getElementById('gaugeChart'),{
+    type:'doughnut',
+    data:{datasets:[{data:[pct,1-pct,1],backgroundColor:[color,'rgba(255,255,255,.15)','transparent'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,rotation:-90,circumference:180,plugins:{legend:{display:false},tooltip:{enabled:false}},cutout:'72%'}
+  });
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+async function exportDashboard(){
+  const btn=document.getElementById('btn-export');
+  const overlay=document.getElementById('export-overlay');
+  btn.classList.add('loading');
+  btn.textContent='Gerando...';
+  overlay.style.display='flex';
+
+  // Small delay to let UI update
+  await new Promise(r=>setTimeout(r,100));
+
+  try{
+    const target=document.getElementById('dash-content');
+    const canvas=await html2canvas(target,{
+      scale:2,
+      useCORS:true,
+      backgroundColor:'#f5f4f9',
+      scrollX:0,
+      scrollY:-window.scrollY,
+      windowWidth:document.documentElement.scrollWidth,
+      windowHeight:document.documentElement.scrollHeight,
+      logging:false
+    });
+
+    // Add header strip to image
+    const final=document.createElement('canvas');
+    const headerH=70;
+    final.width=canvas.width;
+    final.height=canvas.height+headerH*2;
+    const ctx=final.getContext('2d');
+
+    // Header bg
+    ctx.fillStyle='#5b21b6';
+    ctx.fillRect(0,0,final.width,headerH*2);
+
+    // Logo text
+    ctx.fillStyle='#ffffff';
+    ctx.font=`bold ${headerH*0.5}px Inter,sans-serif`;
+    ctx.fillText('∞ PneuStore  ·  Dashboard NPS B2C  ·  '+document.getElementById('badge-mes').textContent, headerH*0.6, headerH*1.1);
+
+    // Date
+    const now=new Date();
+    const dateStr=`Gerado em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.font=`${headerH*0.32}px Inter,sans-serif`;
+    ctx.fillText(dateStr, headerH*0.6, headerH*1.55);
+
+    // Paste dashboard
+    ctx.drawImage(canvas,0,headerH*2);
+
+    const link=document.createElement('a');
+    link.download=`NPS_B2C_${document.getElementById('badge-mes').textContent}_${now.getFullYear()}.png`;
+    link.href=final.toDataURL('image/png');
+    link.click();
+  }catch(e){
+    alert('Erro ao gerar imagem. Tente novamente.');
+  }finally{
+    overlay.style.display='none';
+    btn.classList.remove('loading');
+    btn.innerHTML='⬇ Exportar imagem';
+  }
+}
+</script>
+</body>
+</html>
