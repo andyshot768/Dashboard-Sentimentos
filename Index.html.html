@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard NPS B2C</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161820;
+    --surface2: #1e2028;
+    --border: #2a2d3a;
+    --promotor: #00d4a0;
+    --neutro: #f5c842;
+    --detrator: #ff4d6d;
+    --positivo: #00d4a0;
+    --negativo: #ff4d6d;
+    --accent: #6c63ff;
+    --text: #e8eaf0;
+    --muted: #7a7f94;
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* UPLOAD SCREEN */
+  #upload-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: radial-gradient(ellipse at 30% 50%, #1a1030 0%, var(--bg) 60%);
+  }
+
+  .upload-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    text-align: center;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #fff 40%, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .upload-sub {
+    color: var(--muted);
+    font-size: 1rem;
+    margin-bottom: 48px;
+    text-align: center;
+  }
+
+  .drop-zone {
+    width: min(520px, 90vw);
+    border: 2px dashed var(--border);
+    border-radius: 24px;
+    padding: 64px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .3s;
+    background: var(--surface);
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: #1c1a2e;
+    transform: translateY(-3px);
+    box-shadow: 0 20px 60px rgba(108,99,255,.15);
+  }
+
+  .drop-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+    filter: grayscale(.3);
+  }
+
+  .drop-text {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .drop-hint {
+    font-size: .85rem;
+    color: var(--muted);
+  }
+
+  #file-input { display: none; }
+
+  .tag {
+    display: inline-block;
+    background: #1e1a36;
+    border: 1px solid #3a3560;
+    color: #a09bff;
+    font-size: .75rem;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-top: 20px;
+  }
+
+  /* DASHBOARD */
+  #dashboard { display: none; padding: 0 0 60px; }
+
+  .top-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .top-bar-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .badge-mes {
+    background: var(--accent);
+    color: #fff;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .75rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+
+  .btn-new {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: .85rem;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .2s;
+  }
+
+  .btn-new:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .content { padding: 36px 40px 0; max-width: 1400px; margin: 0 auto; }
+
+  /* NPS GAUGE SECTION */
+  .nps-hero {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .gauge-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .gauge-label {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .gauge-wrap { position: relative; width: 200px; height: 110px; }
+
+  .gauge-score {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'DM Serif Display', serif;
+    font-size: 3rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .gauge-zone {
+    font-size: .78rem;
+    color: var(--muted);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .zones-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .zone-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .zone-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .zone-card.prom::before { background: var(--promotor); }
+  .zone-card.neut::before { background: var(--neutro); }
+  .zone-card.detr::before { background: var(--detrator); }
+
+  .zone-name {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+  }
+
+  .zone-count {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.5rem;
+    line-height: 1;
+  }
+
+  .zone-card.prom .zone-count { color: var(--promotor); }
+  .zone-card.neut .zone-count { color: var(--neutro); }
+  .zone-card.detr .zone-count { color: var(--detrator); }
+
+  .zone-pct {
+    font-size: .85rem;
+    color: var(--muted);
+  }
+
+  /* GRID CHARTS */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+  }
+
+  .chart-card.full { grid-column: 1 / -1; }
+
+  .card-title {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .chart-wrap { position: relative; height: 240px; }
+  .chart-wrap.tall { height: 320px; }
+  .chart-wrap.medium { height: 280px; }
+
+  /* SENTIMENTO BAR */
+  .sentiment-bar {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 48px;
+    margin-bottom: 20px;
+  }
+
+  .sent-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8rem;
+    font-weight: 600;
+    transition: flex .6s cubic-bezier(.4,0,.2,1);
+  }
+
+  .sent-seg.pos { background: var(--positivo); color: #001f18; }
+  .sent-seg.neu { background: var(--neutro); color: #1a1400; }
+  .sent-seg.neg { background: var(--negativo); color: #fff; }
+
+  .sentiment-legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .leg-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .82rem;
+    color: var(--muted);
+  }
+
+  .leg-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* NOTA DIST */
+  .nota-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 140px;
+    padding-bottom: 28px;
+    position: relative;
+  }
+
+  .nota-bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 4px;
+  }
+
+  .nota-bar {
+    width: 100%;
+    border-radius: 6px 6px 0 0;
+    transition: height .6s cubic-bezier(.4,0,.2,1);
+    min-height: 4px;
+  }
+
+  .nota-bar-label { font-size: .7rem; color: var(--muted); }
+  .nota-bar-count { font-size: .72rem; font-weight: 600; }
+
+  /* TEMAS TABLE */
+  .temas-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .tema-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tema-name { font-size: .85rem; }
+
+  .tema-bar-wrap { width: 100px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .tema-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .6s; }
+
+  .tema-count { font-size: .82rem; color: var(--muted); min-width: 30px; text-align: right; }
+
+  /* SUBTEMAS */
+  .subtema-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .subtema-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all .2s;
+    cursor: default;
+  }
+
+  .subtema-pill:hover { border-color: var(--accent); }
+
+  .pill-n {
+    background: var(--accent);
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .nps-hero { grid-template-columns: 1fr; }
+    .zones-grid { grid-template-columns: 1fr; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .content { padding: 20px 16px 0; }
+    .top-bar { padding: 16px 20px; }
+  }
+
+  .loader {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 16px;
+    font-size: .9rem;
+    color: var(--muted);
+  }
+
+  .loader-ring {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- UPLOAD SCREEN -->
+<div id="upload-screen">
+  <h1 class="upload-title">Dashboard NPS B2C</h1>
+  <p class="upload-sub">Faça upload da base mensal para gerar o painel automaticamente</p>
+
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <span class="drop-icon">📊</span>
+    <p class="drop-text">Arraste sua planilha aqui</p>
+    <p class="drop-hint">ou clique para selecionar</p>
+    <span class="tag">.xlsx · .xls</span>
+  </div>
+
+  <input type="file" id="file-input" accept=".xlsx,.xls">
+</div>
+
+<!-- LOADER -->
+<div class="loader" id="loader" style="display:none">
+  <div class="loader-ring"></div>
+  <span>Processando base...</span>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="top-bar">
+    <div class="top-bar-title">
+      NPS B2C
+      <span class="badge-mes" id="badge-mes">—</span>
+    </div>
+    <button class="btn-new" onclick="resetDashboard()">↩ Nova base</button>
+  </div>
+
+  <div class="content">
+
+    <!-- NPS HERO -->
+    <div class="nps-hero" style="margin-top:0;padding-top:28px">
+      <div class="gauge-card">
+        <p class="gauge-label">NPS Score</p>
+        <div class="gauge-wrap">
+          <canvas id="gaugeChart"></canvas>
+          <div class="gauge-score" id="npsScore">—</div>
+        </div>
+        <p class="gauge-zone" id="npsZone">—</p>
+      </div>
+      <div class="zones-grid">
+        <div class="zone-card prom">
+          <span class="zone-name">Promotores</span>
+          <span class="zone-count" id="countProm">—</span>
+          <span class="zone-pct" id="pctProm">—</span>
+        </div>
+        <div class="zone-card neut">
+          <span class="zone-name">Neutros</span>
+          <span class="zone-count" id="countNeut">—</span>
+          <span class="zone-pct" id="pctNeut">—</span>
+        </div>
+        <div class="zone-card detr">
+          <span class="zone-name">Detratores</span>
+          <span class="zone-count" id="countDetr">—</span>
+          <span class="zone-pct" id="pctDetr">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SENTIMENTO + NOTAS -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <p class="card-title">Distribuição de Sentimento</p>
+        <div class="sentiment-bar" id="sentimentBar"></div>
+        <div class="sentiment-legend" id="sentimentLegend"></div>
+        <div style="margin-top:24px">
+          <div class="chart-wrap" style="height:180px">
+            <canvas id="sentimentChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <p class="card-title">Distribuição das Notas</p>
+        <div class="nota-bars" id="notaBars"></div>
+      </div>
+    </div>
+
+    <!-- TEMAS -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <p class="card-title">Principais Temas</p>
+        <div class="temas-list" id="temasList"></div>
+      </div>
+
+      <div class="chart-card">
+        <p class="card-title">Subtemas mais citados</p>
+        <div class="subtema-pills" id="subtemaPills"></div>
+      </div>
+    </div>
+
+    <!-- TEMAS POR CLASSIFICAÇÃO (full width) -->
+    <div class="charts-grid" style="margin-bottom:0">
+      <div class="chart-card full">
+        <p class="card-title">Temas por Classificação NPS</p>
+        <div class="chart-wrap tall">
+          <canvas id="temaClassChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let charts = {};
+
+// ─── FILE HANDLING ───────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('loader').style.display = 'flex';
+  const reader = new FileReader();
+  reader.onload = e => {
+    setTimeout(() => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { defval: null });
+        const fileName = file.name;
+        processData(data, fileName);
+      } catch(err) {
+        alert('Erro ao ler o arquivo. Verifique o formato.');
+        document.getElementById('loader').style.display = 'none';
+      }
+    }, 300);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function resetDashboard() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('upload-screen').style.display = 'flex';
+  fileInput.value = '';
+  Object.values(charts).forEach(c => c && c.destroy());
+  charts = {};
+}
+
+// ─── DATA PROCESSING ─────────────────────────────────────────────────────────
+function processData(data, fileName) {
+  // Detect column names flexibly
+  const sample = data[0] || {};
+  const keys = Object.keys(sample);
+
+  const getCol = (...names) => keys.find(k => names.some(n => k.toLowerCase().includes(n.toLowerCase()))) || null;
+
+  const colNota   = getCol('nota');
+  const colClass  = getCol('classificacao', 'classificação', 'class');
+  const colSent   = getCol('sentimento');
+  const colTema1  = getCol('tema 1', 'tema1');
+  const colSub1   = getCol('subtema 1', 'subtema1');
+  const colTema2  = getCol('tema 2', 'tema2');
+  const colSub2   = getCol('subtema 2', 'subtema2');
+
+  // Extract month from filename
+  const monthMatch = fileName.match(/(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i);
+  const mes = monthMatch ? monthMatch[1].charAt(0).toUpperCase() + monthMatch[1].slice(1).toLowerCase() : fileName.replace(/\.[^.]+$/, '');
+
+  const notas = data.map(r => r[colNota]).filter(v => v !== null && v !== undefined && !isNaN(v));
+  const total = notas.length;
+
+  const promotores = notas.filter(n => n >= 9).length;
+  const neutros    = notas.filter(n => n >= 7 && n <= 8).length;
+  const detratores = notas.filter(n => n <= 6).length;
+  const nps = Math.round(((promotores - detratores) / total) * 100);
+
+  const sentMap = {};
+  data.forEach(r => { const s = r[colSent]; if (s) sentMap[s] = (sentMap[s]||0)+1; });
+
+  const temaMap = {};
+  data.forEach(r => {
+    [r[colTema1], r[colTema2]].forEach(t => {
+      if (t && !t.toLowerCase().includes('sem comentário') && !t.toLowerCase().includes('não informado')) {
+        temaMap[t] = (temaMap[t]||0)+1;
+      }
+    });
+  });
+
+  const subMap = {};
+  data.forEach(r => {
+    [r[colSub1], r[colSub2]].forEach(s => {
+      if (s && !s.toLowerCase().includes('sem comentário')) {
+        subMap[s] = (subMap[s]||0)+1;
+      }
+    });
+  });
+
+  // Temas por classificação
+  const temaClass = {};
+  data.forEach(r => {
+    const cl = r[colClass];
+    const t = r[colTema1];
+    if (cl && t && !t.toLowerCase().includes('sem comentário')) {
+      if (!temaClass[t]) temaClass[t] = { Promotor: 0, Neutro: 0, Detrator: 0 };
+      if (temaClass[t][cl] !== undefined) temaClass[t][cl]++;
+    }
+  });
+
+  const notaDist = {};
+  for (let i = 0; i <= 10; i++) notaDist[i] = 0;
+  notas.forEach(n => { if (notaDist[n] !== undefined) notaDist[n]++; });
+
+  renderDashboard({ mes, total, promotores, neutros, detratores, nps, sentMap, temaMap, subMap, temaClass, notaDist });
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderDashboard(d) {
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+
+  document.getElementById('badge-mes').textContent = d.mes;
+
+  // NPS Score + zone
+  const npsEl = document.getElementById('npsScore');
+  npsEl.textContent = d.nps;
+  let zone = '', zoneColor = '#fff';
+  if (d.nps >= 75) { zone = '🏆 Zona de Excelência'; zoneColor = '#00d4a0'; }
+  else if (d.nps >= 50) { zone = '✅ Zona de Qualidade'; zoneColor = '#6c63ff'; }
+  else if (d.nps >= 0)  { zone = '⚠️ Zona de Aperfeiçoamento'; zoneColor = '#f5c842'; }
+  else { zone = '❌ Zona Crítica'; zoneColor = '#ff4d6d'; }
+  npsEl.style.color = zoneColor;
+  document.getElementById('npsZone').textContent = zone;
+
+  // Gauge
+  renderGauge(d.nps, zoneColor);
+
+  // Zone cards
+  const prom = Math.round(d.promotores / d.total * 100);
+  const neut = Math.round(d.neutros / d.total * 100);
+  const detr = Math.round(d.detratores / d.total * 100);
+  document.getElementById('countProm').textContent = d.promotores;
+  document.getElementById('countNeut').textContent = d.neutros;
+  document.getElementById('countDetr').textContent = d.detratores;
+  document.getElementById('pctProm').textContent = `${prom}% do total`;
+  document.getElementById('pctNeut').textContent = `${neut}% do total`;
+  document.getElementById('pctDetr').textContent = `${detr}% do total`;
+
+  // Sentimento bar
+  const pos = d.sentMap['Positivo'] || 0;
+  const neu = d.sentMap['Neutro'] || 0;
+  const neg = d.sentMap['Negativo'] || 0;
+  const totSent = pos + neu + neg;
+  const bar = document.getElementById('sentimentBar');
+  bar.innerHTML = `
+    <div class="sent-seg pos" style="flex:${pos}">${Math.round(pos/totSent*100)}%</div>
+    <div class="sent-seg neu" style="flex:${neu}">${Math.round(neu/totSent*100)}%</div>
+    <div class="sent-seg neg" style="flex:${neg}">${Math.round(neg/totSent*100)}%</div>
+  `;
+  document.getElementById('sentimentLegend').innerHTML = `
+    <div class="leg-item"><div class="leg-dot" style="background:#00d4a0"></div>Positivo (${pos})</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#f5c842"></div>Neutro (${neu})</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#ff4d6d"></div>Negativo (${neg})</div>
+  `;
+
+  // Sentimento donut
+  if (charts.sentiment) charts.sentiment.destroy();
+  charts.sentiment = new Chart(document.getElementById('sentimentChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Positivo', 'Neutro', 'Negativo'],
+      datasets: [{ data: [pos, neu, neg], backgroundColor: ['#00d4a0','#f5c842','#ff4d6d'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#7a7f94', font: { family: 'DM Sans', size: 12 }, padding: 16 } } }, cutout: '68%' }
+  });
+
+  // Nota distribution bars
+  const maxNota = Math.max(...Object.values(d.notaDist));
+  const notaColors = i => i >= 9 ? '#00d4a0' : i >= 7 ? '#f5c842' : '#ff4d6d';
+  const barsHtml = Object.entries(d.notaDist).map(([n, c]) => {
+    const h = c === 0 ? 4 : Math.max(8, Math.round((c / maxNota) * 100));
+    return `<div class="nota-bar-wrap">
+      <span class="nota-bar-count" style="color:${notaColors(+n)};font-size:.68rem">${c > 0 ? c : ''}</span>
+      <div class="nota-bar" style="height:${h}px;background:${notaColors(+n)}"></div>
+      <span class="nota-bar-label">${n}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('notaBars').innerHTML = barsHtml;
+
+  // Temas list
+  const sortedTemas = Object.entries(d.temaMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const maxTema = sortedTemas[0]?.[1] || 1;
+  document.getElementById('temasList').innerHTML = sortedTemas.map(([name, count]) => `
+    <div class="tema-row">
+      <span class="tema-name">${name}</span>
+      <div class="tema-bar-wrap"><div class="tema-bar-fill" style="width:${Math.round(count/maxTema*100)}%"></div></div>
+      <span class="tema-count">${count}</span>
+    </div>
+  `).join('');
+
+  // Subtemas pills
+  const sortedSubs = Object.entries(d.subMap).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  document.getElementById('subtemaPills').innerHTML = sortedSubs.map(([name, count]) =>
+    `<div class="subtema-pill">${name}<span class="pill-n">${count}</span></div>`
+  ).join('');
+
+  // Temas por classificação stacked bar
+  const temaKeys = Object.keys(d.temaClass).sort((a, b) =>
+    (d.temaClass[b].Promotor + d.temaClass[b].Neutro + d.temaClass[b].Detrator) -
+    (d.temaClass[a].Promotor + d.temaClass[a].Neutro + d.temaClass[a].Detrator)
+  ).slice(0, 8);
+
+  if (charts.temaClass) charts.temaClass.destroy();
+  charts.temaClass = new Chart(document.getElementById('temaClassChart'), {
+    type: 'bar',
+    data: {
+      labels: temaKeys,
+      datasets: [
+        { label: 'Promotor', data: temaKeys.map(t => d.temaClass[t].Promotor), backgroundColor: '#00d4a0', borderRadius: 4 },
+        { label: 'Neutro',   data: temaKeys.map(t => d.temaClass[t].Neutro),   backgroundColor: '#f5c842', borderRadius: 4 },
+        { label: 'Detrator', data: temaKeys.map(t => d.temaClass[t].Detrator), backgroundColor: '#ff4d6d', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#7a7f94', font: { family: 'DM Sans', size: 12 }, padding: 20 } } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#7a7f94', font: { family: 'DM Sans' } }, grid: { color: '#2a2d3a' } },
+        y: { stacked: true, ticks: { color: '#7a7f94', font: { family: 'DM Sans' } }, grid: { color: '#2a2d3a' } }
+      }
+    }
+  });
+}
+
+function renderGauge(score, color) {
+  if (charts.gauge) charts.gauge.destroy();
+  const pct = (score + 100) / 200; // map -100..100 → 0..1
+  const angle = Math.PI * pct;
+  charts.gauge = new Chart(document.getElementById('gaugeChart'), {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [pct, 1 - pct, 1],
+        backgroundColor: [color, '#2a2d3a', 'transparent'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      rotation: -90, circumference: 180,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      cutout: '72%'
+    }
+  });
+}
+</script>
+</body>
+</html>
