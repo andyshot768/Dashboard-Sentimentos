@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard CX · PneuStore</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --purple:#6b21a8;--purple-m:#7c3aed;--purple-l:#a855f7;--purple-xl:#ede9fe;
+  --purple-nav:#5b21b6;--bg:#f3f2f8;--surface:#fff;--surface2:#f8f7fc;
+  --border:#e2dff0;--text:#1a0533;--muted:#7c6f9a;
+  --green:#16a34a;--amber:#d97706;--red:#dc2626;--radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── SETUP MODAL (first access) ── */
+.modal-overlay{position:fixed;inset:0;background:linear-gradient(155deg,#3b0764 0%,#6d28d9 55%,#1e1040 100%);z-index:500;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:20px;padding:36px;width:min(460px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.35);}
+.modal-brand{display:flex;align-items:center;gap:9px;margin-bottom:24px;}
+.modal-brand-pill{background:var(--purple-xl);border-radius:8px;padding:6px 12px;display:flex;align-items:center;gap:7px;}
+.modal-brand-sym{font-size:1.1rem;color:var(--purple);}
+.modal-brand-name{font-size:.85rem;font-weight:800;color:var(--purple);}
+.modal-brand-name span{font-weight:400;}
+.modal-title{font-size:1.25rem;font-weight:900;margin-bottom:5px;color:var(--text);}
+.modal-sub{font-size:.82rem;color:var(--muted);margin-bottom:26px;line-height:1.55;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px;display:block;}
+.input-wrap{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface2);transition:border-color .2s;}
+.input-wrap:focus-within{border-color:var(--purple-m);}
+.form-input{flex:1;padding:9px 12px;border:none;background:transparent;font-family:'Plus Jakarta Sans',sans-serif;font-size:.86rem;color:var(--text);outline:none;}
+.input-suffix{padding:0 12px;font-size:.78rem;color:var(--muted);white-space:nowrap;border-left:1px solid var(--border);}
+.form-hint{font-size:.7rem;color:var(--muted);margin-top:4px;}
+.period-presets{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px;}
+.preset-btn{padding:5px 13px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:.74rem;font-weight:600;transition:all .18s;}
+.preset-btn:hover{border-color:var(--purple-m);color:var(--purple);}
+.preset-btn.active{border-color:var(--purple);color:var(--purple);background:var(--purple-xl);}
+.period-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+.btn-connect{background:var(--purple);color:#fff;border:none;padding:10px 26px;border-radius:8px;cursor:pointer;font-size:.84rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s;display:flex;align-items:center;gap:8px;}
+.btn-connect:hover{background:var(--purple-m);}
+.btn-connect.loading{opacity:.6;pointer-events:none;}
+.connect-error{background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:9px 13px;border-radius:8px;font-size:.78rem;margin-top:12px;display:none;}
+.secure-note{display:flex;align-items:center;gap:6px;font-size:.7rem;color:var(--muted);margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+
+/* ── LOADER ── */
+.loader{position:fixed;inset:0;background:rgba(76,29,149,.95);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:14px;font-size:.88rem;color:rgba(255,255,255,.65);}
+.loader-ring{width:48px;height:48px;border:3px solid rgba(255,255,255,.18);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+.loader-progress{width:260px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden;}
+.loader-bar{height:100%;background:#a855f7;border-radius:2px;transition:width .4s;width:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── EXPORT OVERLAY ── */
+#export-overlay{position:fixed;inset:0;background:rgba(76,29,149,.9);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+
+/* ── TOPBAR ── */
+#dashboard{display:none;padding-bottom:60px;}
+.top-bar{background:var(--purple-nav);padding:0 32px;display:flex;align-items:stretch;justify-content:space-between;position:sticky;top:0;z-index:100;height:56px;box-shadow:0 2px 16px rgba(91,33,182,.3);}
+.top-left{display:flex;align-items:center;gap:14px;}
+.logo-pill{background:#fff;border-radius:7px;padding:5px 13px;display:flex;align-items:center;gap:7px;cursor:pointer;transition:background .2s;}
+.logo-pill:hover{background:#ede9fe;}
+.logo-sym{font-size:1.2rem;color:var(--purple);}
+.logo-name{font-size:.85rem;font-weight:800;color:var(--purple);}
+.logo-name span{font-weight:400;}
+.tb-divider{width:1px;height:20px;background:rgba(255,255,255,.18);}
+.tb-title{font-size:.8rem;font-weight:700;letter-spacing:.07em;color:rgba(255,255,255,.5);text-transform:uppercase;}
+.tb-title strong{color:#fff;}
+.tb-badge{background:rgba(255,255,255,.14);color:#c4b5fd;font-size:.67rem;font-weight:700;padding:3px 10px;border-radius:4px;border:1px solid rgba(196,181,253,.28);letter-spacing:.07em;}
+.live-dot{display:inline-flex;align-items:center;gap:5px;font-size:.67rem;color:rgba(255,255,255,.45);}
+.live-dot span{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.top-right{display:flex;align-items:center;gap:8px;}
+.btn-icon{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:7px 12px;border-radius:7px;cursor:pointer;font-size:.82rem;transition:all .2s;}
+.btn-icon:hover{background:rgba(255,255,255,.22);}
+.btn-icon.spinning{animation:spin .7s linear infinite;}
+.btn-export{background:#fff;color:var(--purple);border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:.77rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;gap:6px;transition:all .2s;text-transform:uppercase;letter-spacing:.05em;}
+.btn-export:hover{background:#ede9fe;}
+.btn-export.loading{opacity:.5;pointer-events:none;}
+.btn-settings{background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.2);padding:7px 14px;border-radius:7px;cursor:pointer;font-size:.76rem;font-family:'Plus Jakarta Sans',sans-serif;transition:all .2s;display:flex;align-items:center;gap:6px;}
+.btn-settings:hover{background:rgba(255,255,255,.22);color:#fff;}
+
+/* ── PERIOD BAR ── */
+.period-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 32px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.period-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);}
+.period-btn{padding:5px 14px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:.74rem;font-weight:600;transition:all .18s;}
+.period-btn:hover{border-color:var(--purple-m);color:var(--purple);}
+.period-btn.active{border-color:var(--purple);color:var(--purple);background:var(--purple-xl);font-weight:700;}
+.period-sep{width:1px;height:16px;background:var(--border);}
+.period-custom{display:flex;align-items:center;gap:7px;}
+.period-input{padding:5px 9px;border:1.5px solid var(--border);border-radius:6px;font-family:'Plus Jakarta Sans',sans-serif;font-size:.74rem;color:var(--text);background:var(--surface2);outline:none;transition:border-color .2s;}
+.period-input:focus{border-color:var(--purple-m);}
+.btn-apply{background:var(--purple);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:.74rem;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;}
+.btn-apply:hover{background:var(--purple-m);}
+.period-info{margin-left:auto;font-size:.71rem;color:var(--muted);}
+.period-info strong{color:var(--purple-m);}
+
+/* ── TABS ── */
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;display:flex;overflow-x:auto;}
+.tab-btn{padding:13px 18px;font-size:.74rem;font-weight:700;color:var(--muted);border:none;background:transparent;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;border-bottom:2px solid transparent;transition:all .18s;white-space:nowrap;text-transform:uppercase;letter-spacing:.06em;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--purple);border-bottom-color:var(--purple);}
+
+/* ── CONTENT ── */
+.content{padding:22px 32px 0;max-width:1400px;margin:0 auto;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ── KPI ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;}
+.kpi-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 16px;position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s;}
+.kpi-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.07);}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.kpi-card.good::before{background:var(--green);}
+.kpi-card.warn::before{background:var(--amber);}
+.kpi-card.bad::before{background:var(--red);}
+.kpi-card.neutral::before{background:var(--purple);}
+.kpi-label{font-size:.61rem;text-transform:uppercase;letter-spacing:.13em;color:var(--muted);font-weight:700;margin-bottom:6px;}
+.kpi-value{font-size:1.8rem;font-weight:900;line-height:1;margin-bottom:3px;}
+.kpi-card.good .kpi-value{color:var(--green);}
+.kpi-card.warn .kpi-value{color:var(--amber);}
+.kpi-card.bad  .kpi-value{color:var(--red);}
+.kpi-card.neutral .kpi-value{color:var(--purple);}
+.kpi-sub{font-size:.69rem;color:var(--muted);}
+
+/* ── GRIDS ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid-full{margin-bottom:18px;}
+.chart-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:20px;}
+.card-title{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:7px;}
+.card-title::before{content:'';display:block;width:3px;height:10px;background:var(--purple);border-radius:2px;flex-shrink:0;}
+.chart-h180{position:relative;height:180px;}
+.chart-h220{position:relative;height:220px;}
+.chart-h260{position:relative;height:260px;}
+.chart-h300{position:relative;height:300px;}
+
+/* ── HBAR ── */
+.hbar-list{display:flex;flex-direction:column;gap:9px;}
+.hbar-row{display:flex;align-items:center;gap:10px;}
+.hbar-label{font-size:.77rem;min-width:120px;flex-shrink:0;}
+.hbar-track{flex:1;height:6px;background:var(--border);border-radius:4px;overflow:hidden;}
+.hbar-fill{height:100%;border-radius:4px;transition:width .5s;}
+.hbar-val{font-size:.73rem;font-weight:700;color:var(--muted);min-width:40px;text-align:right;}
+
+/* ── SLA BAR ── */
+.sla-bar{display:flex;border-radius:8px;overflow:hidden;height:36px;margin-bottom:12px;}
+.sla-seg{display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;transition:flex .5s;min-width:0;overflow:hidden;}
+.sla-seg.ok{background:var(--green);color:#fff;}
+.sla-seg.viol{background:var(--red);color:#fff;}
+
+.empty-state{text-align:center;padding:28px 20px;color:var(--muted);font-size:.83rem;}
+
+@media(max-width:900px){
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+  .content,.top-bar,.period-bar,.tabs-bar{padding-left:14px;padding-right:14px;}
+  .kpi-strip{grid-template-columns:repeat(2,1fr);}
+  .period-info{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP MODAL ══ -->
+<div class="modal-overlay" id="setup-modal">
+  <div class="modal">
+    <div class="modal-brand">
+      <div class="modal-brand-pill">
+        <span class="modal-brand-sym">∞</span>
+        <span class="modal-brand-name">Pneu<span>Store</span></span>
+      </div>
+    </div>
+    <h2 class="modal-title">Dashboard CX</h2>
+    <p class="modal-sub">Configure sua conexão com o Zendesk. As credenciais ficam salvas no seu navegador e não são compartilhadas.</p>
+
+    <div class="form-group">
+      <label class="form-label">Subdomínio</label>
+      <div class="input-wrap">
+        <input class="form-input" id="zd-subdomain" placeholder="cpxdistribuidorasa">
+        <span class="input-suffix">.zendesk.com</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">E-mail</label>
+      <div class="input-wrap"><input class="form-input" id="zd-email" placeholder="seu@email.com"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">API Token</label>
+      <div class="input-wrap"><input class="form-input" id="zd-token" type="password" placeholder="Cole seu token aqui"></div>
+      <p class="form-hint">Zendesk Admin → Aplicativos e integrações → Tokens da API</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Período inicial</label>
+      <div class="period-presets" id="modal-presets">
+        <button class="preset-btn" onclick="setPreset(7,this)">7 dias</button>
+        <button class="preset-btn" onclick="setPreset(15,this)">15 dias</button>
+        <button class="preset-btn active" onclick="setPreset(30,this)">30 dias</button>
+        <button class="preset-btn" onclick="setPreset(60,this)">60 dias</button>
+        <button class="preset-btn" onclick="setPreset('month',this)">Este mês</button>
+        <button class="preset-btn" onclick="setPreset('lastmonth',this)">Mês anterior</button>
+      </div>
+      <div class="period-dates">
+        <div><label class="form-label">De</label><input class="form-input" type="date" id="zd-start" style="border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);width:100%;"></div>
+        <div><label class="form-label">Até</label><input class="form-input" type="date" id="zd-end" style="border:1.5px solid var(--border);border-radius:8px;background:var(--surface2);width:100%;"></div>
+      </div>
+    </div>
+
+    <div class="connect-error" id="connect-error"></div>
+    <div class="modal-actions">
+      <button class="btn-connect" id="btn-connect" onclick="doConnect()">
+        <span id="btn-connect-text">⚡ Entrar no Dashboard</span>
+      </button>
+    </div>
+    <p class="secure-note">🔒 Suas credenciais são salvas apenas neste navegador (localStorage)</p>
+  </div>
+</div>
+
+<!-- ══ LOADER ══ -->
+<div class="loader" id="loader" style="display:none">
+  <div class="loader-ring"></div>
+  <span id="loader-msg">Conectando ao Zendesk...</span>
+  <div class="loader-progress"><div class="loader-bar" id="loader-bar"></div></div>
+</div>
+
+<!-- ══ EXPORT OVERLAY ══ -->
+<div id="export-overlay" style="display:none;position:fixed;inset:0;background:rgba(76,29,149,.9);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px;">
+  <div style="width:46px;height:46px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;"></div>
+  <span style="color:rgba(255,255,255,.7);font-size:.88rem;">Gerando imagem...</span>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="dashboard">
+
+  <div class="top-bar">
+    <div class="top-left">
+      <div class="logo-pill" onclick="openSettings()" title="Configurações">
+        <span class="logo-sym">∞</span>
+        <span class="logo-name">Pneu<span>Store</span></span>
+      </div>
+      <div class="tb-divider"></div>
+      <span class="tb-title"><strong>Dashboard CX</strong></span>
+      <span class="tb-badge" id="badge-periodo">—</span>
+      <span class="live-dot"><span></span>Zendesk</span>
+    </div>
+    <div class="top-right">
+      <button class="btn-icon" id="btn-refresh" onclick="refreshData()" title="Atualizar dados">↻</button>
+      <button class="btn-settings" onclick="openSettings()">⚙ Configurações</button>
+      <button class="btn-export" id="btn-export" onclick="exportDash()">⬇ Exportar</button>
+    </div>
+  </div>
+
+  <!-- PERIOD BAR -->
+  <div class="period-bar">
+    <span class="period-label">Período:</span>
+    <button class="period-btn" onclick="changePeriod(7,this)">7 dias</button>
+    <button class="period-btn" onclick="changePeriod(15,this)">15 dias</button>
+    <button class="period-btn active" onclick="changePeriod(30,this)">30 dias</button>
+    <button class="period-btn" onclick="changePeriod(60,this)">60 dias</button>
+    <button class="period-btn" onclick="changePeriod('month',this)">Este mês</button>
+    <button class="period-btn" onclick="changePeriod('lastmonth',this)">Mês anterior</button>
+    <div class="period-sep"></div>
+    <div class="period-custom">
+      <input type="date" class="period-input" id="custom-start">
+      <span style="font-size:.72rem;color:var(--muted)">até</span>
+      <input type="date" class="period-input" id="custom-end">
+      <button class="btn-apply" onclick="applyCustom()">Aplicar</button>
+    </div>
+    <span class="period-info" id="period-info"></span>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="showTab('acesso',this)">📶 Acesso & Capacidade</button>
+    <button class="tab-btn" onclick="showTab('eficiencia',this)">⚡ Eficiência Operacional</button>
+    <button class="tab-btn" onclick="showTab('qualidade',this)">⭐ Qualidade & CSAT</button>
+    <button class="tab-btn" onclick="showTab('volume',this)">📊 Volume de Tickets</button>
+    <button class="tab-btn" onclick="showTab('motivos',this)">🔍 Motivos</button>
+  </div>
+
+  <!-- TAB ACESSO -->
+  <div class="tab-panel active" id="tab-acesso"><div class="content">
+    <div class="kpi-strip" id="kpi-acesso"></div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Volume de Tickets por Dia</p><div class="chart-h220"><canvas id="chart-vol-dia"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">SLA Cumprido vs Violado</p><div id="sla-strip"></div><div class="chart-h180"><canvas id="chart-sla-trend"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Volume por Canal</p><div class="chart-h220"><canvas id="chart-canais"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Volume por Status</p><div class="chart-h220"><canvas id="chart-status"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Volume Mensal (BCR)</p><div class="chart-h220"><canvas id="chart-bcr"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Top Lojas / Origens</p><div class="hbar-list" id="hbar-lojas"></div></div>
+    </div>
+  </div></div>
+
+  <!-- TAB EFICIÊNCIA -->
+  <div class="tab-panel" id="tab-eficiencia"><div class="content">
+    <div class="kpi-strip" id="kpi-eficiencia"></div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Evolução SLA Violado %</p><div class="chart-h260"><canvas id="chart-sla-viol"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Evolução SLA Cumprido %</p><div class="chart-h260"><canvas id="chart-sla-ok"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">SLA Stacked por Dia</p><div class="chart-h260"><canvas id="chart-sla-stack"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Top Grupos / Assignees</p><div class="hbar-list" id="hbar-grupos"></div></div>
+    </div>
+  </div></div>
+
+  <!-- TAB QUALIDADE -->
+  <div class="tab-panel" id="tab-qualidade"><div class="content">
+    <div class="kpi-strip" id="kpi-qualidade"></div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Volume por Assunto / Tipo</p><div class="hbar-list" id="hbar-assuntos"></div></div>
+      <div class="chart-card"><p class="card-title">TMA · TME · FCR (h)</p><div class="chart-h220"><canvas id="chart-tempos"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Tickets por Prioridade</p><div class="chart-h220"><canvas id="chart-prioridade"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Satisfação por Tag</p><div class="hbar-list" id="hbar-tags"></div></div>
+    </div>
+  </div></div>
+
+  <!-- TAB VOLUME -->
+  <div class="tab-panel" id="tab-volume"><div class="content">
+    <div class="kpi-strip" id="kpi-volume"></div>
+    <div class="grid-full"><div class="chart-card"><p class="card-title">Volume de Tickets por Dia</p><div class="chart-h300"><canvas id="chart-vol-full"></canvas></div></div></div>
+    <div class="grid-3">
+      <div class="chart-card"><p class="card-title">Por Canal</p><div class="chart-h220"><canvas id="chart-canal-pie"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Por Status</p><div class="chart-h220"><canvas id="chart-status-pie"></canvas></div></div>
+      <div class="chart-card"><p class="card-title">Por Tipo</p><div class="chart-h220"><canvas id="chart-tipo-pie"></canvas></div></div>
+    </div>
+  </div></div>
+
+  <!-- TAB MOTIVOS -->
+  <div class="tab-panel" id="tab-motivos"><div class="content">
+    <div class="kpi-strip" id="kpi-motivos"></div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Top Tags (motivos)</p><div class="hbar-list" id="hbar-top-tags"></div></div>
+      <div class="chart-card"><p class="card-title">Distribuição por Tipo de Ticket</p><div class="chart-h220"><canvas id="chart-tipo-bar"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="chart-card"><p class="card-title">Tickets por Assunto</p><div class="hbar-list" id="hbar-assunto-mot"></div></div>
+      <div class="chart-card"><p class="card-title">Evolução Semanal</p><div class="chart-h220"><canvas id="chart-semanal"></canvas></div></div>
+    </div>
+  </div></div>
+
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const charts = {};
+let G = {};
+let ZD = {};
+let PERIOD = { start:'', end:'' };
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  ZD = {
+    subdomain: localStorage.getItem('zd_sub')   || '',
+    email:     localStorage.getItem('zd_email') || '',
+    token:     localStorage.getItem('zd_token') || '',
+  };
+
+  // Pre-fill form
+  if (ZD.subdomain) document.getElementById('zd-subdomain').value = ZD.subdomain;
+  if (ZD.email)     document.getElementById('zd-email').value     = ZD.email;
+  if (ZD.token)     document.getElementById('zd-token').value     = ZD.token;
+  setPreset(30);
+
+  // If already configured → auto-connect
+  if (ZD.subdomain && ZD.email && ZD.token) {
+    autoConnect();
+  } else {
+    openSetupModal();
+  }
+};
+
+function openSetupModal() {
+  document.getElementById('setup-modal').classList.add('open');
+}
+
+function openSettings() {
+  document.getElementById('connect-error').style.display = 'none';
+  document.getElementById('setup-modal').classList.add('open');
+}
+
+// ── PERIOD HELPERS ────────────────────────────────────────────────────────────
+function fmtDate(d){ return d.toISOString().split('T')[0]; }
+
+function setPreset(preset, btn) {
+  const now = new Date(); let start, end = fmtDate(now);
+  if (preset === 'month') {
+    start = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  } else if (preset === 'lastmonth') {
+    start = fmtDate(new Date(now.getFullYear(), now.getMonth()-1, 1));
+    end   = fmtDate(new Date(now.getFullYear(), now.getMonth(), 0));
+  } else {
+    const d = new Date(); d.setDate(d.getDate() - parseInt(preset)); start = fmtDate(d);
+  }
+  document.getElementById('zd-start').value = start;
+  document.getElementById('zd-end').value   = end;
+  document.querySelectorAll('#modal-presets .preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function changePeriod(preset, btn) {
+  const now = new Date(); let start, end = fmtDate(now);
+  if (preset === 'month') {
+    start = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  } else if (preset === 'lastmonth') {
+    start = fmtDate(new Date(now.getFullYear(), now.getMonth()-1, 1));
+    end   = fmtDate(new Date(now.getFullYear(), now.getMonth(), 0));
+  } else {
+    const d = new Date(); d.setDate(d.getDate() - parseInt(preset)); start = fmtDate(d);
+  }
+  PERIOD = { start, end };
+  document.getElementById('custom-start').value = start;
+  document.getElementById('custom-end').value   = end;
+  document.querySelectorAll('.period-bar .period-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  reloadData();
+}
+
+function applyCustom() {
+  const s = document.getElementById('custom-start').value;
+  const e = document.getElementById('custom-end').value;
+  if (!s || !e) return;
+  PERIOD = { start:s, end:e };
+  document.querySelectorAll('.period-bar .period-btn').forEach(b => b.classList.remove('active'));
+  reloadData();
+}
+
+function updatePeriodDisplay() {
+  document.getElementById('badge-periodo').textContent =
+    PERIOD.start && PERIOD.end ? `${PERIOD.start} → ${PERIOD.end}` : '—';
+  const diff = PERIOD.start && PERIOD.end
+    ? Math.round((new Date(PERIOD.end) - new Date(PERIOD.start)) / 86400000) : 0;
+  document.getElementById('period-info').innerHTML =
+    `<strong>${PERIOD.start}</strong> até <strong>${PERIOD.end}</strong> &nbsp;·&nbsp; ${diff} dias`;
+  document.getElementById('custom-start').value = PERIOD.start;
+  document.getElementById('custom-end').value   = PERIOD.end;
+}
+
+// ── CONNECT ───────────────────────────────────────────────────────────────────
+async function doConnect() {
+  const sub   = document.getElementById('zd-subdomain').value.trim();
+  const email = document.getElementById('zd-email').value.trim();
+  const token = document.getElementById('zd-token').value.trim();
+  const start = document.getElementById('zd-start').value;
+  const end   = document.getElementById('zd-end').value;
+
+  if (!sub || !email || !token) { showError('Preencha todos os campos.'); return; }
+  if (!start || !end)           { showError('Selecione o período.'); return; }
+
+  localStorage.setItem('zd_sub',   sub);
+  localStorage.setItem('zd_email', email);
+  localStorage.setItem('zd_token', token);
+  ZD = { subdomain:sub, email, token };
+  PERIOD = { start, end };
+
+  const btn = document.getElementById('btn-connect');
+  btn.classList.add('loading');
+  document.getElementById('btn-connect-text').textContent = 'Conectando...';
+  document.getElementById('connect-error').style.display = 'none';
+
+  try {
+    await fetchAndBuild();
+    document.getElementById('setup-modal').classList.remove('open');
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    btn.classList.remove('loading');
+    document.getElementById('btn-connect-text').textContent = '⚡ Entrar no Dashboard';
+  }
+}
+
+async function autoConnect() {
+  PERIOD = {
+    start: document.getElementById('zd-start').value,
+    end:   document.getElementById('zd-end').value,
+  };
+  try {
+    await fetchAndBuild();
+  } catch(e) {
+    // Credentials may be stale — show modal
+    openSetupModal();
+    showError('Sessão expirada ou credenciais inválidas. Reconecte.');
+  }
+}
+
+async function reloadData() {
+  try { await fetchAndBuild(); }
+  catch(e) { alert('Erro ao recarregar: ' + e.message); }
+}
+
+async function refreshData() {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  try { await fetchAndBuild(); }
+  catch(e) { alert('Erro: ' + e.message); }
+  finally { btn.classList.remove('spinning'); }
+}
+
+function showError(msg) {
+  const el = document.getElementById('connect-error');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+// ── ZENDESK API (via Vercel proxy) ───────────────────────────────────────────
+const PROXY = 'https://zendesk-proxy-theta.vercel.app/api/proxy';
+
+function zdAuth() {
+  return 'Basic ' + btoa(`${ZD.email}/token:${ZD.token}`);
+}
+function zdBase() {
+  return `https://${ZD.subdomain}.zendesk.com`;
+}
+function proxyUrl(path) {
+  return `${PROXY}?url=${encodeURIComponent(zdBase() + path)}`;
+}
+
+async function zdGet(path) {
+  const res = await fetch(proxyUrl(path), {
+    headers: { 'Authorization': zdAuth(), 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.description || `Erro ${res.status} — verifique subdomínio, e-mail e token.`);
+  }
+  return res.json();
+}
+
+async function zdGetAll(path, key) {
+  let all = [], url = path + (path.includes('?') ? '&' : '?') + 'per_page=100';
+  while (url) {
+    const fullUrl = zdBase() + url;
+    const data = await fetch(`${PROXY}?url=${encodeURIComponent(fullUrl)}`, {
+      headers: { 'Authorization': zdAuth(), 'Content-Type': 'application/json' }
+    }).then(r => r.json());
+    all = all.concat(data[key] || []);
+    const next = data.next_page || null;
+    url = next ? next.replace(zdBase(), '') : null;
+  }
+  return all;
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('loader-bar').style.width = pct + '%';
+  if (msg) document.getElementById('loader-msg').textContent = msg;
+}
+
+// ── PROCESS SINGLE TICKET (streaming — sem acumular memória) ─────────────────
+function initG() {
+  G = {
+    totalTickets: 0,
+    volByDate: {}, byCanal: {}, byStatus: {}, byTipo: {},
+    byPrioridade: {}, byAssunto: {}, byTag: {}, byGrupo: {},
+    bcr: {}, slaTrend: { dates:[], ok:[], viol:[] },
+    slaOk: 0, slaViol: 0,
+    csat: null, tma: null, tme: null, fcr: null,
+    weeklyVol: {}, satisfactions: [],
+    _slaTotal: 0, _slaOkCount: 0,
+  };
+}
+
+function processTicket(t) {
+  G.totalTickets++;
+
+  const d = (t.created_at || '').slice(0, 10);
+  if (d) {
+    G.volByDate[d] = (G.volByDate[d]||0) + 1;
+    const wk = getWeek(new Date(d));
+    G.weeklyVol[wk] = (G.weeklyVol[wk]||0)+1;
+    const mo = monthName(d.slice(0,7));
+    G.bcr[mo] = (G.bcr[mo]||0) + 1;
+  }
+
+  const ch = t.via?.channel || t.channel || 'outro';
+  const chLabel = { web:'Web', email:'E-mail', api:'API', mobile:'Mobile', chat:'Chat', voice:'Voz', any_channel:'Omnichannel', instagram_dm:'Instagram', twitter_dm:'Twitter', facebook:'Facebook', whatsapp:'WhatsApp' }[ch] || ch;
+  G.byCanal[chLabel] = (G.byCanal[chLabel]||0)+1;
+
+  const stMap = { new:'Novo', open:'Aberto', pending:'Pendente', hold:'Em espera', solved:'Resolvido', closed:'Fechado' };
+  const st = stMap[t.status] || t.status || '?';
+  G.byStatus[st] = (G.byStatus[st]||0)+1;
+
+  const tpMap = { problem:'Problema', incident:'Incidente', question:'Dúvida', task:'Tarefa' };
+  const tp = tpMap[t.type] || 'Não classificado';
+  G.byTipo[tp] = (G.byTipo[tp]||0)+1;
+
+  const prMap = { low:'Baixa', normal:'Normal', high:'Alta', urgent:'Urgente' };
+  const pr = prMap[t.priority] || 'Normal';
+  G.byPrioridade[pr] = (G.byPrioridade[pr]||0)+1;
+
+  const subj = (t.subject||'').trim();
+  if (subj) {
+    const cat = classifySubject(subj.toUpperCase());
+    const key = cat || (subj.length > 30 ? subj.slice(0,28)+'…' : subj);
+    G.byAssunto[key] = (G.byAssunto[key]||0)+1;
+  }
+
+  (t.tags||[]).forEach(tag => { G.byTag[tag] = (G.byTag[tag]||0)+1; });
+
+  if (t.group_id) {
+    const gname = `Grupo ${t.group_id}`;
+    G.byGrupo[gname] = (G.byGrupo[gname]||0)+1;
+  }
+
+  if (t.sla_policy) {
+    G._slaTotal++;
+    const metrics = t.sla_policy?.policy_metrics || [];
+    if (!metrics.some(m => m.breached)) G._slaOkCount++;
+  }
+}
+
+function finalizeG() {
+  if (G._slaTotal > 0) {
+    G.slaOk   = G._slaOkCount / G._slaTotal;
+    G.slaViol = 1 - G.slaOk;
+  } else {
+    const solved = (G.byStatus['Resolvido']||0) + (G.byStatus['Fechado']||0);
+    G.slaOk   = G.totalTickets > 0 ? solved / G.totalTickets : 0;
+    G.slaViol = 1 - G.slaOk;
+  }
+  const sortedDates = Object.keys(G.volByDate).sort();
+  G.slaTrend.dates = sortedDates;
+  sortedDates.forEach(() => {
+    G.slaTrend.ok.push(Math.round(G.slaOk * 100));
+    G.slaTrend.viol.push(Math.round(G.slaViol * 100));
+  });
+}
+
+async function fetchAndBuild() {
+  showLoader();
+  try {
+    setProgress(5, 'Verificando credenciais...');
+    await zdGet('/api/v2/users/me.json');
+
+    setProgress(10, 'Buscando tickets...');
+
+    const startUnix = Math.floor(new Date(PERIOD.start + 'T00:00:00Z').getTime() / 1000);
+    const endUnix   = Math.floor(new Date(PERIOD.end   + 'T23:59:59Z').getTime() / 1000);
+
+    initG();
+
+    let searchUrl = `/api/v2/search/export.json?filter[type]=ticket&query=${encodeURIComponent('created>=' + PERIOD.start + ' created<=' + PERIOD.end)}&page[size]=1000`;
+    let pageCount = 0;
+    let firstPage = true;
+
+    while (searchUrl) {
+      const data = await zdGet(searchUrl);
+      const batch = data.results || [];
+
+      // Processa cada ticket individualmente — sem acumular array
+      batch.forEach(t => processTicket(t));
+      pageCount++;
+
+      const pct = Math.min(10 + pageCount * 12, 80);
+      setProgress(pct, `${G.totalTickets} tickets processados...`);
+
+      // Mostra dashboard parcial na primeira página
+      if (firstPage && G.totalTickets > 0) {
+        firstPage = false;
+        finalizeG();
+        updatePeriodDisplay();
+        buildDashboard();
+        document.getElementById('dashboard').style.display = 'block';
+      }
+
+      searchUrl = data.meta?.has_more && data.links?.next
+        ? data.links.next.replace(zdBase(), '')
+        : null;
+    }
+
+    // Recalcula e atualiza com dados completos
+    finalizeG();
+    setProgress(88, 'Buscando satisfação...');
+    try {
+      const sat = await zdGet(`/api/v2/satisfaction_ratings.json?score=all&start_time=${startUnix}&end_time=${endUnix}`);
+      processSatisfaction(sat.satisfaction_ratings || []);
+    } catch(e) { /* opcional */ }
+
+    setProgress(100, `Pronto! ${G.totalTickets} tickets carregados.`);
+    await new Promise(r => setTimeout(r, 300));
+    updatePeriodDisplay();
+    buildDashboard();
+    document.getElementById('dashboard').style.display = 'block';
+  } finally {
+    hideLoader();
+  }
+}
+
+// ── PROCESS TICKETS (legacy — mantido para compatibilidade) ───────────────────
+function processTickets(tickets) {
+  initG();
+  tickets.forEach(t => processTicket(t));
+  finalizeG();
+}
+
+function processSatisfaction(ratings) {
+  if (!ratings.length) return;
+  const good = ratings.filter(r => r.score === 'good').length;
+  G.csat = good / ratings.length;
+}
+
+function classifySubject(s) {
+  if (/entrega|prazo|atraso|frete/.test(s)) return 'ENTREGA';
+  if (/cancel/.test(s)) return 'CANCELAMENTO';
+  if (/garantia/.test(s)) return 'GARANTIA';
+  if (/troca|devolv/.test(s)) return 'TROCA DE MERCADORIA';
+  if (/fatura|nota fiscal|boleto/.test(s)) return 'ERRO FATURAMENTO';
+  if (/financ|pagamento|parcelamento/.test(s)) return 'INF. FINANCEIRAS';
+  if (/medida|modelo|tamanho/.test(s)) return 'ERRO MEDIDA';
+  if (/estoque/.test(s)) return 'SEM ESTOQUE';
+  if (/parceiro/.test(s)) return 'REDE DE PARCEIROS';
+  if (/psmóvel|ps movel|psmov/.test(s)) return 'PSMÓVEL';
+  return null;
+}
+
+function getWeek(d) {
+  const onejan = new Date(d.getFullYear(), 0, 1);
+  return `Sem ${Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7)}`;
+}
+
+function monthName(ym) {
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return months[parseInt(ym.split('-')[1])-1] || ym;
+}
+
+// ── BUILD DASHBOARD ───────────────────────────────────────────────────────────
+function buildDashboard() {
+  const PP = ['#6b21a8','#7c3aed','#a855f7','#c084fc','#d8b4fe','#ede9fe','#4c1d95','#8b5cf6'];
+  const SC = {Fechado:'#16a34a',Resolvido:'#22c55e',Aberto:'#dc2626',Novo:'#7c3aed',Pendente:'#d97706','Em espera':'#94a3b8'};
+  const co = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#7c6f9a', font:{ family:'Plus Jakarta Sans', size:11 }, padding:12 } } } };
+  const ax = { x:{ ticks:{ color:'#7c6f9a', font:{ family:'Plus Jakarta Sans', size:10 }, maxTicksLimit:10 }, grid:{ color:'#e2dff0' } }, y:{ ticks:{ color:'#7c6f9a', font:{ family:'Plus Jakarta Sans', size:10 } }, grid:{ color:'#e2dff0' } } };
+
+  const fmt = (v,t) => {
+    if (v===null||v===undefined) return '—';
+    if (t==='pct') return (v*100).toFixed(1)+'%';
+    if (t==='h')   return v.toFixed(1)+'h';
+    if (t==='int') return Math.round(v).toLocaleString('pt-BR');
+    return String(v);
+  };
+
+  function mkKPI(id, items) {
+    document.getElementById(id).innerHTML = items.map(({label,value,sub,status}) =>
+      `<div class="kpi-card ${status}"><p class="kpi-label">${label}</p><p class="kpi-value">${value}</p><p class="kpi-sub">${sub||''}</p></div>`
+    ).join('');
+  }
+
+  function mkChart(id, cfg) {
+    if (charts[id]) charts[id].destroy();
+    const el = document.getElementById(id);
+    if (!el) return;
+    charts[id] = new Chart(el, cfg);
+  }
+
+  function mkHBar(id, obj, max=10, color='#7c3aed') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const sorted = Object.entries(obj).filter(([k])=>k.trim()&&k!="'-"&&k!=' ').sort((a,b)=>b[1]-a[1]).slice(0,max);
+    if (!sorted.length) { el.innerHTML='<p class="empty-state">Sem dados no período</p>'; return; }
+    const mx = sorted[0][1];
+    el.innerHTML = sorted.map(([n,v]) =>
+      `<div class="hbar-row"><span class="hbar-label" title="${n}">${n.length>22?n.slice(0,20)+'…':n}</span><div class="hbar-track"><div class="hbar-fill" style="width:${Math.round(v/mx*100)}%;background:${color}"></div></div><span class="hbar-val">${Math.round(v).toLocaleString('pt-BR')}</span></div>`
+    ).join('');
+  }
+
+  // ── ACESSO ──
+  mkKPI('kpi-acesso', [
+    {label:'Total Tickets',  value:fmt(G.totalTickets,'int'), sub:'no período',   status:'neutral'},
+    {label:'SLA Cumprido',   value:fmt(G.slaOk,'pct'),       sub:'do total',     status:G.slaOk>0.5?'good':'bad'},
+    {label:'SLA Violado',    value:fmt(G.slaViol,'pct'),      sub:'do total',     status:G.slaViol<0.5?'warn':'bad'},
+    {label:'Canais Ativos',  value:Object.keys(G.byCanal).length, sub:'canais',  status:'neutral'},
+  ]);
+  const vD = Object.keys(G.volByDate).sort();
+  mkChart('chart-vol-dia',{type:'bar',data:{labels:vD.map(d=>d.slice(5)),datasets:[{label:'Tickets',data:vD.map(d=>G.volByDate[d]),backgroundColor:'#7c3aed',borderRadius:4}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  const sokP = Math.round(G.slaOk*100), sviolP = Math.round(G.slaViol*100);
+  document.getElementById('sla-strip').innerHTML=`<div class="sla-bar"><div class="sla-seg ok" style="flex:${sokP||1}">${sokP}% OK</div><div class="sla-seg viol" style="flex:${sviolP||1}">${sviolP}% Violado</div></div>`;
+  mkChart('chart-sla-trend',{type:'line',data:{labels:G.slaTrend.dates.map(d=>d.slice(5)),datasets:[{label:'Cumprido %',data:G.slaTrend.ok,borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.1)',tension:.3,fill:true,pointRadius:2},{label:'Violado %',data:G.slaTrend.viol,borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.07)',tension:.3,fill:true,pointRadius:2}]},options:{...co,scales:ax}});
+  mkChart('chart-canais',{type:'doughnut',data:{labels:Object.keys(G.byCanal),datasets:[{data:Object.values(G.byCanal),backgroundColor:PP,borderWidth:0}]},options:{...co,cutout:'60%'}});
+  mkChart('chart-status',{type:'doughnut',data:{labels:Object.keys(G.byStatus),datasets:[{data:Object.values(G.byStatus),backgroundColor:Object.keys(G.byStatus).map(s=>SC[s]||'#94a3b8'),borderWidth:0}]},options:{...co,cutout:'60%'}});
+  const bL=Object.keys(G.bcr);
+  mkChart('chart-bcr',{type:'bar',data:{labels:bL,datasets:[{label:'Tickets',data:bL.map(k=>G.bcr[k]),backgroundColor:PP,borderRadius:6}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  mkHBar('hbar-lojas',G.byCanal,10);
+
+  // ── EFICIÊNCIA ──
+  mkKPI('kpi-eficiencia',[
+    {label:'TMA',          value:fmt(G.tma,'h'),      sub:'tempo médio atend.', status:G.tma&&G.tma<24?'good':G.tma&&G.tma<72?'warn':'neutral'},
+    {label:'TME',          value:fmt(G.tme,'h'),      sub:'tempo médio espera', status:G.tme&&G.tme<24?'good':G.tme&&G.tme<72?'warn':'neutral'},
+    {label:'SLA Cumprido', value:fmt(G.slaOk,'pct'),  sub:'do total',           status:G.slaOk>0.5?'good':'bad'},
+    {label:'SLA Violado',  value:fmt(G.slaViol,'pct'),sub:'do total',           status:G.slaViol<0.5?'warn':'bad'},
+  ]);
+  mkChart('chart-sla-viol',{type:'line',data:{labels:G.slaTrend.dates.map(d=>d.slice(5)),datasets:[{label:'Violado %',data:G.slaTrend.viol,borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.07)',tension:.35,fill:true,pointRadius:2}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  mkChart('chart-sla-ok',{type:'line',data:{labels:G.slaTrend.dates.map(d=>d.slice(5)),datasets:[{label:'Cumprido %',data:G.slaTrend.ok,borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.1)',tension:.35,fill:true,pointRadius:2}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  mkChart('chart-sla-stack',{type:'bar',data:{labels:G.slaTrend.dates.map(d=>d.slice(5)),datasets:[{label:'Cumprido %',data:G.slaTrend.ok,backgroundColor:'rgba(22,163,74,.8)',borderRadius:3,stack:'s'},{label:'Violado %',data:G.slaTrend.viol,backgroundColor:'rgba(220,38,38,.75)',borderRadius:3,stack:'s'}]},options:{...co,scales:{x:{...ax.x,stacked:true},y:{...ax.y,stacked:true}}}});
+  mkHBar('hbar-grupos',G.byGrupo,10,'#a855f7');
+
+  // ── QUALIDADE ──
+  mkKPI('kpi-qualidade',[
+    {label:'CSAT',         value:G.csat!==null?(G.csat*100).toFixed(1)+'%':'—', sub:'satisfação', status:G.csat>0.8?'good':G.csat>0.6?'warn':'neutral'},
+    {label:'FCR',          value:fmt(G.fcr,'h'),  sub:'1ª resolução', status:'neutral'},
+    {label:'Top Assunto',  value:Object.entries(G.byAssunto).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—', sub:'maior volume', status:'neutral'},
+    {label:'Tipos Ativos', value:Object.keys(G.byTipo).length, sub:'tipos', status:'neutral'},
+  ]);
+  mkHBar('hbar-assuntos',G.byAssunto,10);
+  mkChart('chart-tempos',{type:'bar',data:{labels:['FCR (h)','TMA (h)','TME (h)'],datasets:[{data:[G.fcr||0,G.tma||0,G.tme||0],backgroundColor:['#7c3aed','#a855f7','#c084fc'],borderRadius:6}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  const prKeys=Object.keys(G.byPrioridade);
+  mkChart('chart-prioridade',{type:'doughnut',data:{labels:prKeys,datasets:[{data:prKeys.map(k=>G.byPrioridade[k]),backgroundColor:['#dc2626','#d97706','#16a34a','#94a3b8'],borderWidth:0}]},options:{...co,cutout:'55%'}});
+  mkHBar('hbar-tags',G.byTag,10,'#c084fc');
+
+  // ── VOLUME ──
+  mkKPI('kpi-volume',[
+    {label:'Total',       value:fmt(G.totalTickets,'int'), sub:'tickets no período', status:'neutral'},
+    {label:'Pico Diário', value:fmt(Math.max(...Object.values(G.volByDate||{0:0})),'int'), sub:'max/dia', status:'warn'},
+    {label:'Média Diária',value:fmt(G.totalTickets/Math.max(Object.keys(G.volByDate||{}).length,1),'int'), sub:'tickets/dia', status:'neutral'},
+    {label:'Canal Top',   value:Object.entries(G.byCanal).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—', sub:'maior volume', status:'neutral'},
+  ]);
+  mkChart('chart-vol-full',{type:'line',data:{labels:vD.map(d=>d.slice(5)),datasets:[{label:'Tickets',data:vD.map(d=>G.volByDate[d]),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.3,fill:true,pointRadius:3,pointBackgroundColor:'#7c3aed'}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  mkChart('chart-canal-pie',{type:'pie',data:{labels:Object.keys(G.byCanal),datasets:[{data:Object.values(G.byCanal),backgroundColor:PP,borderWidth:0}]},options:{...co}});
+  mkChart('chart-status-pie',{type:'pie',data:{labels:Object.keys(G.byStatus),datasets:[{data:Object.values(G.byStatus),backgroundColor:Object.keys(G.byStatus).map(s=>SC[s]||'#94a3b8'),borderWidth:0}]},options:{...co}});
+  const tpK=Object.keys(G.byTipo);
+  mkChart('chart-tipo-pie',{type:'pie',data:{labels:tpK,datasets:[{data:tpK.map(k=>G.byTipo[k]),backgroundColor:['#6b21a8','#7c3aed','#a855f7','#c084fc'],borderWidth:0}]},options:{...co}});
+
+  // ── MOTIVOS ──
+  const topA = Object.entries(G.byAssunto).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  mkKPI('kpi-motivos',[
+    {label:'Top 1', value:topA[0]?.[0]||'—', sub:`${Math.round(topA[0]?.[1]||0)} tickets`, status:'bad'},
+    {label:'Top 2', value:topA[1]?.[0]||'—', sub:`${Math.round(topA[1]?.[1]||0)} tickets`, status:'warn'},
+    {label:'Top 3', value:topA[2]?.[0]||'—', sub:`${Math.round(topA[2]?.[1]||0)} tickets`, status:'neutral'},
+    {label:'Tags únicas', value:Object.keys(G.byTag).length, sub:'tags', status:'neutral'},
+  ]);
+  mkHBar('hbar-top-tags',G.byTag,10,'#6b21a8');
+  const tpB=Object.keys(G.byTipo);
+  mkChart('chart-tipo-bar',{type:'bar',data:{labels:tpB,datasets:[{label:'Tickets',data:tpB.map(k=>G.byTipo[k]),backgroundColor:PP,borderRadius:5}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+  mkHBar('hbar-assunto-mot',G.byAssunto,10,'#7c3aed');
+  const wK=Object.keys(G.weeklyVol).sort();
+  mkChart('chart-semanal',{type:'line',data:{labels:wK,datasets:[{label:'Tickets',data:wK.map(k=>G.weeklyVol[k]),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.3,fill:true,pointRadius:4,pointBackgroundColor:'#7c3aed'}]},options:{...co,plugins:{legend:{display:false}},scales:ax}});
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// ── LOADER ────────────────────────────────────────────────────────────────────
+function showLoader(){ document.getElementById('loader').style.display='flex'; setProgress(0); }
+function hideLoader(){ document.getElementById('loader').style.display='none'; }
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+async function exportDash() {
+  const btn = document.getElementById('btn-export');
+  const ov  = document.getElementById('export-overlay');
+  btn.classList.add('loading'); btn.textContent='Gerando...'; ov.style.display='flex';
+  await new Promise(r => setTimeout(r, 150));
+  try {
+    const canvas = await html2canvas(document.getElementById('dashboard'), {
+      scale:2, useCORS:true, backgroundColor:'#f3f2f8', scrollY:-window.scrollY, logging:false
+    });
+    const final = document.createElement('canvas');
+    const hh = 80; final.width = canvas.width; final.height = canvas.height + hh;
+    const ctx = final.getContext('2d');
+    ctx.fillStyle = '#5b21b6'; ctx.fillRect(0, 0, final.width, hh);
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${hh*.42}px "Plus Jakarta Sans",sans-serif`;
+    ctx.fillText(`∞ PneuStore · Dashboard CX · ${PERIOD.start} → ${PERIOD.end}`, hh*.5, hh*.62);
+    const now = new Date();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = `${hh*.27}px "Plus Jakarta Sans",sans-serif`;
+    ctx.fillText(`Gerado em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`, hh*.5, hh*.88);
+    ctx.drawImage(canvas, 0, hh);
+    const link = document.createElement('a');
+    link.download = `Dashboard_CX_${PERIOD.start}_${PERIOD.end}.png`;
+    link.href = final.toDataURL('image/png'); link.click();
+  } catch(e) { alert('Erro ao exportar: ' + e.message); }
+  finally { ov.style.display='none'; btn.classList.remove('loading'); btn.innerHTML='⬇ Exportar'; }
+}
+</script>
+</body>
+</html>
